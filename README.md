@@ -40,3 +40,9 @@ Simulation outputs obtained at multiple mesh resolutions are analyzed to assess 
 
 The top descriptors identified through SHAP importance are compiled into a structured dataset for downstream statistical exploration. Predictors are standardized, while the target hardness variable is retained in physical units. This dataset supports correlation studies, multicollinearity diagnostics, and factor-structure analysis.
 
+## Data Availability
+
+The datasets used in this study are compiled from experimental literature sources.
+To maintain review integrity, raw and intermediate datasets are not included at this stage.
+
+All processed datasets will be made publicly available upon publication.
