@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Data
+*.csv
+*.xlsx
+*.mat
+
+# Outputs
+output/
+results/
+plots/
+
+# System
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
