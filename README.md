@@ -46,3 +46,28 @@ The datasets used in this study are compiled from experimental literature source
 To maintain review integrity, raw and intermediate datasets are not included at this stage.
 
 All processed datasets will be made publicly available upon publication.
+
+## How to Run
+
+Install dependencies:
+pip install -r requirements.txt
+
+Run the pipeline sequentially:
+
+python step1_preprocessing.py
+python step2_baseline_models.py
+python step3_descriptor_construction.py
+python step4_descriptor_models_tuned.py
+python step4_metrics_visualization.py
+python step5_shap_analysis.py
+python step6_ansys_input_generation.py
+python step6_1_mesh_convergence.py
+python step7_minitab_dataset.py
+
+## Citation
+
+If this repository contributes to your research, please cite:
+
+Physics-Informed Explainable Machine Learning for Hardness Prediction in High-Entropy Alloys.
+
+Input dataset available upon request.
