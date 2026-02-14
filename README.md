@@ -1,0 +1,2 @@
+# Physics-Informed-Explainable-Machine-Learning-for-Hardness-Prediction-in-High-Entropy-Alloys
+Physics-informed machine learning pipeline for hardness prediction in high-entropy alloys. Combines composition-derived descriptors, model benchmarking, SHAP-based interpretability, statistical analysis, and finite element input generation to support reproducible, physically consistent materials modeling.
