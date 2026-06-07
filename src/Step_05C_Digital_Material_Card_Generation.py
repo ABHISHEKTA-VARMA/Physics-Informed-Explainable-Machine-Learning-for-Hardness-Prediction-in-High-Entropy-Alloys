@@ -35,7 +35,9 @@ sns.set_style("whitegrid")
 if not inp.exists():
     raise FileNotFoundError(f"Missing optimization results: {inp}")
 
+print("Loading candidate data...")
 df = pd.read_csv(inp)
+print(f"Candidates loaded: {len(df)}")
 
 known_elements = [
     "Al",
@@ -130,7 +132,7 @@ if len(df) < 500:
     ].reset_index(drop=True)
 
 if len(df) == 0:
-    raise ValueError("No alloys survived governance.")
+    raise ValueError("No alloys satisfied selection criteria.")
 
 uncertainty_limit = np.percentile(
     df["Prediction_Uncertainty"],
@@ -148,7 +150,11 @@ df = df.loc[
 ].reset_index(drop=True)
 
 if len(df) == 0:
-    raise ValueError("No alloys survived reliability filtering.")
+    raise ValueError(
+        "No alloys satisfied uncertainty and descriptor-distance criteria."
+    )
+
+print(f"Candidates after filtering: {len(df)}")
 
 
 def normalize(values):
@@ -162,7 +168,7 @@ df["manufacturability_index"] = (
     1 - normalize(df["dominant_fraction"])
 )
 
-df["FEM_Score"] = (
+df["Candidate_Score"] = (
     0.25 * normalize(df["Predicted_HV"])
     + 0.15 * normalize(df["thermoelastic_stability"])
     + 0.10 * normalize(df["entropy_stabilization"])
@@ -177,9 +183,9 @@ family_labels = []
 
 for _, row in df.iterrows():
     if row["refractory_fraction"] >= df["refractory_fraction"].quantile(0.75):
-        family = "Refractory_Strengthened"
+        family = "Refractory_Dominant"
     elif row["delta"] >= df["delta"].quantile(0.75):
-        family = "Distortion_Strengthened"
+        family = "Distortion_Dominant"
     elif row["entropy_stabilization"] >= df["entropy_stabilization"].quantile(0.75):
         family = "Entropy_Stabilized"
     else:
@@ -187,7 +193,7 @@ for _, row in df.iterrows():
 
     family_labels.append(family)
 
-df["Physics_Family"] = family_labels
+df["Candidate_Family"] = family_labels
 
 cluster_features = [
     "Predicted_HV",
@@ -215,16 +221,18 @@ df["Cluster"] = cluster_model.fit_predict(scaled)
 selected_rows = []
 
 family_targets = {
-    "Refractory_Strengthened": 2,
-    "Distortion_Strengthened": 2,
+    "Refractory_Dominant": 2,
+    "Distortion_Dominant": 2,
     "Entropy_Stabilized": 2,
     "Balanced_MPEA": 2,
 }
 
+print("Selecting final candidate alloys...")
+
 for family, target_count in family_targets.items():
     family_df = (
-        df.loc[df["Physics_Family"] == family]
-        .sort_values("FEM_Score", ascending=False)
+        df.loc[df["Candidate_Family"] == family]
+        .sort_values("Candidate_Score", ascending=False)
         .reset_index(drop=True)
     )
 
@@ -250,7 +258,7 @@ for family, target_count in family_targets.items():
             break
 
 remaining_df = (
-    df.sort_values("FEM_Score", ascending=False)
+    df.sort_values("Candidate_Score", ascending=False)
     .reset_index(drop=True)
 )
 
@@ -275,7 +283,7 @@ for _, row in remaining_df.iterrows():
 final_alloys = pd.DataFrame(selected_rows).reset_index(drop=True)
 
 if len(final_alloys) == 0:
-    raise ValueError("No final alloys survived selection.")
+    raise ValueError("No final candidate alloys satisfied final selection criteria.")
 
 final_alloys["FEM_Alloy_ID"] = [
     f"FEM_ALLOY_{index + 1}"
@@ -303,11 +311,11 @@ final_alloys.to_csv(
 
 summary_cols = [
     "FEM_Alloy_ID",
-    "Physics_Family",
+    "Candidate_Family",
     "Predicted_HV",
     "Prediction_Uncertainty",
     "Descriptor_Distance",
-    "FEM_Score",
+    "Candidate_Score",
     "Composition",
 ]
 
@@ -390,7 +398,7 @@ for bar in bars:
     )
 
 plt.xlabel("Predicted Hardness (HV)")
-plt.ylabel("Final FEM Alloy")
+plt.ylabel("Final Candidate Alloy")
 plt.tight_layout()
 
 plt.savefig(
@@ -405,16 +413,17 @@ result_file = save_dir / "final_fem_candidate_alloys.csv"
 with open(result_file, "rb") as file:
     sha256 = hashlib.sha256(file.read()).hexdigest()
 
-print("Final FEM candidates")
+print("Final candidate alloys selected for finite element analysis")
+
 print(
     final_alloys[
         [
             "FEM_Alloy_ID",
-            "Physics_Family",
+            "Candidate_Family",
             "Predicted_HV",
             "Prediction_Uncertainty",
             "Descriptor_Distance",
-            "FEM_Score",
+            "Candidate_Score",
             "Composition",
         ]
     ]
@@ -423,3 +432,224 @@ print(
 print(f"Selected alloys: {len(final_alloys)}")
 print(f"Output folder: {save_dir}")
 print(f"SHA256: {sha256}")
+
+print("Generating publication figures...")
+
+plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Arial", "Helvetica"],
+    "axes.linewidth": 1.5,
+    "axes.labelsize": 14,
+    "axes.titlesize": 16,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+    "legend.fontsize": 12,
+    "legend.frameon": False,
+})
+
+sns.set_theme(style="ticks", context="paper")
+
+# Figure 3.4.1: Candidate screening distributions
+try:
+    global_df = pd.read_csv(
+        "output/step5a_global_exploration/global_candidate_design_space.csv"
+    )
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+
+    sns.kdeplot(
+        data=global_df,
+        x="Smix_estimate",
+        fill=True,
+        color="#8c92ac",
+        alpha=0.6,
+        ax=axes[0],
+        cut=0,
+    )
+
+    axes[0].set_title(
+        "(a) Initial Candidate Space",
+        fontweight="bold",
+    )
+    axes[0].set_xlabel(
+        "Mixing Entropy (J/K.mol)",
+        fontweight="bold",
+    )
+    axes[0].set_ylabel(
+        "Probability Density",
+        fontweight="bold",
+    )
+
+    sns.kdeplot(
+        data=df,
+        x="Predicted_HV",
+        fill=True,
+        color="#d62728",
+        alpha=0.8,
+        ax=axes[1],
+        cut=0,
+    )
+
+    axes[1].set_title(
+        "(b) Selected Candidate Population",
+        fontweight="bold",
+    )
+    axes[1].set_xlabel(
+        "Predicted Hardness (HV)",
+        fontweight="bold",
+    )
+    axes[1].set_ylabel("")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        save_dir / "Fig3_4_1_Candidate_Screening.png",
+        dpi=600,
+    )
+
+    plt.close()
+
+    print("Figure 3.4.1 saved.")
+
+except Exception as e:
+    print(f"Skipping Figure 3.4.1: {e}")
+
+# Figure 3.4.2: Elemental distribution heatmap
+try:
+    heatmap_data = final_alloys[elements].copy()
+    heatmap_data.index = final_alloys["FEM_Alloy_ID"]
+
+    heatmap_data = heatmap_data.loc[
+        :,
+        (heatmap_data != 0).any(axis=0),
+    ]
+
+    heatmap_data = heatmap_data * 100
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    mask = heatmap_data == 0
+
+    sns.heatmap(
+        heatmap_data,
+        mask=mask,
+        cmap="rocket_r",
+        annot=True,
+        fmt=".1f",
+        annot_kws={
+            "size": 12,
+            "weight": "bold",
+        },
+        cbar_kws={
+            "label": "Atomic Percentage (at%)",
+        },
+        linewidths=2,
+        linecolor="white",
+        ax=ax,
+    )
+
+    ax.set_xlabel(
+        "Active Alloying Elements",
+        fontweight="bold",
+    )
+    ax.set_ylabel(
+        "Selected MPEA Candidates",
+        fontweight="bold",
+    )
+    ax.set_title(
+        "Elemental Distribution Across Selected Candidate Alloys",
+        pad=15,
+        fontweight="bold",
+    )
+
+    plt.xticks(rotation=0, fontweight="bold")
+    plt.yticks(rotation=0, fontweight="bold")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        save_dir / "Fig3_4_2_Chemical_Heatmap.png",
+        dpi=600,
+    )
+
+    plt.close()
+
+    print("Figure 3.4.2 saved.")
+
+except Exception as e:
+    print(f"Skipping Figure 3.4.2: {e}")
+
+# Figure 3.4.3: Adaptive optimization convergence
+try:
+    from matplotlib.ticker import MaxNLocator
+
+    opt_history = pd.read_csv(
+        "output/step5b_adaptive_optimization/adaptive_optimization_results.csv"
+    )
+
+    convergence_data = (
+        opt_history.groupby("Iteration")["Predicted_HV"]
+        .max()
+        .reset_index()
+    )
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    ax.plot(
+        convergence_data["Iteration"],
+        convergence_data["Predicted_HV"],
+        marker="o",
+        markersize=6,
+        linewidth=2.5,
+        color="#1f77b4",
+    )
+
+    max_iter = convergence_data["Iteration"].max()
+    inflection = int(max_iter * 0.3) if max_iter > 10 else 3
+
+    ax.axvspan(
+        0,
+        inflection,
+        color="lightgray",
+        alpha=0.3,
+        label="Initial Search Stage",
+    )
+
+    ax.axvspan(
+        inflection,
+        max_iter,
+        color="#d62728",
+        alpha=0.1,
+        label="Refinement Stage",
+    )
+
+    ax.set_xlabel(
+        "Optimization Iteration",
+        fontweight="bold",
+    )
+    ax.set_ylabel(
+        "Maximum Predicted Hardness (HV)",
+        fontweight="bold",
+    )
+    ax.set_title(
+        "Adaptive Optimization Convergence",
+        pad=15,
+        fontweight="bold",
+    )
+
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.legend(loc="lower right")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        save_dir / "Fig3_4_3_Optimization_Convergence.png",
+        dpi=600,
+    )
+
+    plt.close()
+
+    print("Figure 3.4.3 saved.")
+
+except Exception as e:
+    print(f"Skipping Figure 3.4.3: {e}")
