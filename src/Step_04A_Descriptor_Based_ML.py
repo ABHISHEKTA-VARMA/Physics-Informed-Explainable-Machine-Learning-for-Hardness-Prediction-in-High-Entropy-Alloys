@@ -279,6 +279,8 @@ def evaluate_models(X_df, y, y_bins, models):
     feature_importance_std = {}
 
     for name, pipe in models.items():
+        print(f"  {name}", flush=True)
+
         r2_scores = []
         rmse_scores = []
         mae_scores = []
@@ -710,8 +712,14 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     set_style()
 
+    print("Loading dataset...", flush=True)
     df = load_data(DATA_PATH)
+    print(f"Samples: {len(df)}", flush=True)
+    print(f"Input file: {DATA_PATH}", flush=True)
+
     X_df = prepare_descriptors(df)
+    print(f"\nRetained descriptors: {X_df.shape[1]}", flush=True)
+
     y = df[TARGET].values
     sample_ids = df["SAMPLE_ID"].values
 
@@ -723,6 +731,8 @@ def main():
     )
 
     models = build_models()
+
+    print("\nEvaluating models...", flush=True)
     results, cv_preds, cv_uncertainty, feature_importances, feature_importance_std = evaluate_models(
         X_df,
         y,
@@ -730,6 +740,7 @@ def main():
         models,
     )
 
+    print("\nSaving outputs...", flush=True)
     save_core_outputs(
         OUTPUT_DIR,
         X_df,
@@ -742,8 +753,11 @@ def main():
         feature_importances,
         feature_importance_std,
     )
+
     save_diagnostic_outputs(OUTPUT_DIR, DATA_PATH)
     save_hash(OUTPUT_DIR)
+
+    print()
     show_summary(OUTPUT_DIR, X_df, df)
 
 
