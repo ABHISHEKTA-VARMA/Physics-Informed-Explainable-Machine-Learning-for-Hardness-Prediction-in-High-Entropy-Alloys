@@ -1,0 +1,147 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+
+# Configuration
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.size": 12,
+    "axes.linewidth": 1.2
+})
+
+output_directory = Path("Manuscript_Figures")
+output_directory.mkdir(exist_ok=True)
+
+color_palette = {'ML Predicted': '#4C72B0', 'FEM Derived': '#C44E52'}
+
+# Data Loading
+df_hv = pd.read_csv('ML_FEM_HV.csv')
+df_uts = pd.read_csv('ML_FEM_UTS.csv')
+df_fatigue = pd.read_csv('FEM_FATIGUE.csv')
+df_temp = pd.read_csv('FEM_ELEVATED_TEMPERATURE_HV.csv')
+
+# Figure 1: Hardness Comparison
+fig1, ax1 = plt.subplots(figsize=(7, 5))
+hv_melted = df_hv.melt(
+    id_vars='ALLOY_NO', 
+    value_vars=['ML PREDICTED HV', 'FEM DERIVED HV']
+)
+hv_melted['variable'] = hv_melted['variable'].replace({
+    'ML PREDICTED HV': 'ML Predicted', 
+    'FEM DERIVED HV': 'FEM Derived'
+})
+
+sns.barplot(
+    x='ALLOY_NO', y='value', hue='variable', 
+    data=hv_melted, palette=color_palette, 
+    edgecolor='black', ax=ax1
+)
+
+for container in ax1.containers:
+    ax1.bar_label(container, fmt='%.0f', fontsize=8, padding=2)
+
+ax1.set_ylim(600, 720)
+ax1.set_ylabel('Hardness (HV)')
+ax1.set_xlabel('')
+ax1.set_title('Hardness Validation')
+ax1.legend(title='', frameon=True)
+plt.savefig(output_directory / 'Fig1_HV_Comparison.png', dpi=600, bbox_inches='tight')
+plt.close(fig1)
+
+# Figure 2: UTS Comparison
+fig2, ax2 = plt.subplots(figsize=(7, 5))
+uts_melted = df_uts.melt(
+    id_vars='ALLOY_NO', 
+    value_vars=['ML PREDICTED UTS (MPa)', 'FEM DERIVED UTS (MPa)']
+)
+uts_melted['variable'] = uts_melted['variable'].replace({
+    'ML PREDICTED UTS (MPa)': 'ML Predicted', 
+    'FEM DERIVED UTS (MPa)': 'FEM Derived'
+})
+
+sns.barplot(
+    x='ALLOY_NO', y='value', hue='variable', 
+    data=uts_melted, palette=color_palette, 
+    edgecolor='black', ax=ax2
+)
+
+for container in ax2.containers:
+    ax2.bar_label(container, fmt='%.0f', fontsize=8, padding=2)
+
+ax2.set_ylabel('UTS (MPa)')
+ax2.set_xlabel('')
+ax2.set_title('Tensile Strength Comparison')
+ax2.legend(title='', frameon=True)
+plt.savefig(output_directory / 'Fig2_UTS_Comparison.png', dpi=600, bbox_inches='tight')
+plt.close(fig2)
+
+# Figure 3: Validation Error Summary
+fig3, ax3 = plt.subplots(figsize=(6, 5))
+df_err = pd.DataFrame({
+    'Alloy': df_hv['ALLOY_NO'],
+    'HV Error': abs(df_hv['FEM DERIVED HV'] - df_hv['ML PREDICTED HV']) / df_hv['FEM DERIVED HV'] * 100,
+    'UTS Error': abs(df_uts['FEM DERIVED UTS (MPa)'] - df_uts['ML PREDICTED UTS (MPa)']) / df_uts['FEM DERIVED UTS (MPa)'] * 100
+})
+
+df_err_melted = df_err.melt('Alloy', var_name='Metric', value_name='Err')
+sns.barplot(x='Alloy', y='Err', hue='Metric', data=df_err_melted, edgecolor='black', ax=ax3)
+
+ax3.axhline(1, color='gray', linestyle='--', linewidth=1, alpha=0.5)
+ax3.axhline(3, color='gray', linestyle='--', linewidth=1, alpha=0.5)
+ax3.set_ylim(0, 4)
+ax3.set_ylabel('Absolute Relative Error (%)')
+ax3.grid(axis='y', alpha=0.3)
+ax3.set_title('Validation Error Summary')
+plt.savefig(output_directory / 'Fig3_Error.png', dpi=600, bbox_inches='tight')
+plt.close(fig3)
+
+# Figure 4: Fatigue Performance
+fig4, ax4 = plt.subplots(figsize=(7, 5))
+df_f20 = df_fatigue[df_fatigue['LOADING CONDITION'] == '20kN'].sort_values('LIFE CYCLES', ascending=False)
+bars = sns.barplot(
+    x='ALLOY_NO', y='LIFE CYCLES', data=df_f20, 
+    palette='viridis', edgecolor='black', ax=ax4
+)
+ax4.set_yscale('log')
+ax4.bar_label(bars.containers[0], fmt='%.0e', fontsize=9, padding=3)
+ax4.set_ylabel('Fatigue Life (Cycles)')
+ax4.set_xlabel('Alloy')
+ax4.set_title('Fatigue Performance (20 kN)')
+ax4.grid(axis='y', alpha=0.3, linestyle='--')
+plt.savefig(output_directory / 'Fig4_Fatigue_Comparison.png', dpi=600, bbox_inches='tight')
+plt.close(fig4)
+
+# Figure 5: Temperature Response
+fig5, ax5 = plt.subplots(figsize=(7, 5))
+for alloy in df_temp['Alloy_No.'].str.upper().unique():
+    sub = df_temp[df_temp['Alloy_No.'].str.upper() == alloy]
+    ax5.plot(sub['Temperatue (C)'], sub['Hardness(HV)'], marker='s', markersize=8, linewidth=2.5, label=alloy)
+
+ax5.set_xlim(0, 820)
+ax5.set_xticks([27, 200, 400, 600, 800])
+ax5.set_xlabel('Temperature (°C)')
+ax5.set_ylabel('Hardness (HV)')
+ax5.grid(alpha=0.3)
+ax5.legend(ncol=2, frameon=True)
+ax5.set_title("Elevated-Temperature Hardness Response")
+plt.savefig(output_directory / 'Fig5_Temp_Hardness.png', dpi=600, bbox_inches='tight')
+plt.close(fig5)
+
+# Figure 6: Hardness Retention
+fig6, ax6 = plt.subplots(figsize=(7, 5))
+for alloy in df_temp['Alloy_No.'].str.upper().unique():
+    sub = df_temp[df_temp['Alloy_No.'].str.upper() == alloy]
+    rt_hv = sub['Hardness(HV)'].iloc[0]
+    ax6.plot(sub['Temperatue (C)'], (sub['Hardness(HV)'] / rt_hv) * 100, marker='s', markersize=8, linewidth=2.5, label=alloy)
+
+ax6.set_xlim(0, 820)
+ax6.set_xticks([27, 200, 400, 600, 800])
+ax6.set_ylim(60, 105)
+ax6.set_xlabel('Temperature (°C)')
+ax6.set_ylabel('Hardness Retention (%)')
+ax6.grid(alpha=0.3)
+ax6.legend(ncol=2, frameon=True)
+ax6.set_title("Hardness Retention with Temperature")
+plt.savefig(output_directory / 'Fig6_Hardness_Retention.png', dpi=600, bbox_inches='tight')
+plt.close(fig6)
